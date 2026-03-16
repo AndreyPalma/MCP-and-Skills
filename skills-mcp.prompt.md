@@ -1,4 +1,4 @@
-﻿# Skills y MCPs para Desarrolladores de IA
+# Skills y MCPs para Desarrolladores de IA
 
 ---
 
@@ -8,9 +8,9 @@ En el contexto de la IA para desarrolladores, un **Skill** (habilidad) represent
 
 El modelo de IA central puede acceder a diferentes módulos de Skills según sea necesario. Estos módulos contienen instrucciones y conocimiento especializado. Por ejemplo:
 
-- **Skill de Diseño Frontend:** Incluye principios de composición, guías de estilo y reglas para evitar estéticas genéricas.
-- **Skill de Arquitectura Limpia:** Proporciona directrices sobre cómo estructurar el código de forma modular y mantenible.
-- **Skill de Pruebas Unitarias:** Contiene las mejores prácticas para escribir pruebas efectivas y con buena cobertura.
+- **`rpg-best-practices`:** Define estándares de codificación RPG IV / ILE RPG, reglas importantes, estructuración de procedimientos, evitar código legacy con indicadores numéricos etc.
+- **`rpg-documentation`:** Guía al modelo para generar comentarios de cabecera en programas RPG, documentar parámetros de `*ENTRY PLIST` y mantener trazabilidad de cambios en ambiente AS400.
+- **`rpg-troubleshooting`:** Contiene patrones de diagnóstico de errores comunes en IBM i: mensajes de escape (`*ESCAPE`), volcados de trabajo (`DMPJOB`), análisis de `JOBLOG` y técnicas de depuración con `STRDBG`.
 
 La clave es que estas habilidades son **conocimiento especializado que la IA carga bajo demanda**. No es un prompt gigante que siempre está presente, sino experiencia que el modelo invoca cuando la tarea lo requiere, lo que ayuda a no saturar el contexto de la conversación.
 
@@ -22,9 +22,9 @@ Un **MCP** (Model Context Protocol) es el mecanismo que permite a un modelo de I
 
 El modelo de IA central extiende conectores hacia herramientas y sistemas externos. Cada conector es un MCP que proporciona una funcionalidad específica o acceso a datos de terceros:
 
-- **MCP para Chrome:** Permite al modelo navegar por la web en tiempo real, extraer información de páginas o interactuar con elementos de una interfaz.
-- **MCP para APIs (como Ticket Taylor):** Le da al modelo la capacidad de consultar y manipular datos de servicios externos.
-- **MCP para Bases de Datos (SQL / Google Search):** Proporciona acceso a repositorios de información estructurada o a motores de búsqueda para obtener datos externos.
+- **MCP para IBM i / DB2 for i:** Permite al modelo ejecutar consultas SQL directamente sobre tablas del sistema (`QSYS2`, `SYSTABLES`, `SYSCOLUMNS`), consultar datos de producción y analizar estructuras de ficheros físicos y lógicos.
+- **MCP para Job Queue / Scheduler AS400:** Le da al modelo la capacidad de consultar el estado de trabajos en batch (`WRKJOBQ`), revisar la cola de salida (`WRKSPLF`) y disparar o monitorear procesos calendarizados en el sistema.
+- **MCP para TOBi Project Builder:** Automatiza la generación de la estructura de carpetas y archivos de un proyecto TOBi al recibir únicamente el número de pase, eliminando el proceso manual de creación y reduciendo errores de configuración inicial.
 
 A diferencia de los Skills, que son conocimiento especializado, los MCPs son **funcionalidad pura y acceso a datos dinámicos**. Permiten al desarrollador configurar a la IA para que "pueda hacer" cosas en el mundo real, no solo "saber cómo" hacerlas.
 
@@ -57,9 +57,9 @@ Genera una infografía visual con el siguiente concepto y estructura. El objetiv
 - Icono principal: Libro abierto con una bombilla encima (líneas negras, detalle en rojo).
 - Título con tipografía manuscrita: `"Skills = Saber cómo hacer algo bien"`
 - Tres tarjetas conectadas al cerebro con flechas a mano:
-  - `"Diseño Frontend"` → guías de composición y estilo
-  - `"Arquitectura Limpia"` → estructura de código modular
-  - `"Pruebas Unitarias"` → mejores prácticas de testing
+  - `"rpg-best-practices"` → estándares de codificación ILE RPG
+  - `"rpg-documentation"` → documentación de programas AS400
+  - `"rpg-troubleshooting"` → diagnóstico de errores y JOBLOG
 - Nota al pie en letra pequeña manuscrita: `"Se activan bajo demanda · No saturan el contexto"`
 
 ---
@@ -73,9 +73,9 @@ Genera una infografía visual con el siguiente concepto y estructura. El objetiv
 - Icono principal: Llave inglesa o enchufe (líneas negras, detalle en rojo).
 - Título con tipografía manuscrita: `"MCPs = Poder hacer algo en el mundo real"`
 - Tres bloques conectados con flechas dibujadas a mano:
-  - `"Chrome"` → navegar y extraer información de la web
-  - `"API / Ticket Taylor"` → consultar datos de servicios externos
-  - `"SQL / Google Search"` → acceder a bases de datos y buscadores
+  - `"IBM i / DB2 for i"` → consultar tablas y estructuras del sistema
+  - `"Job Queue / Scheduler"` → monitorear y disparar procesos batch
+  - `"TOBi Project Builder"` → generar estructura de proyecto automáticamente al indicar número de pase
 - Nota al pie en letra pequeña manuscrita: `"Funcionalidad pura · Datos dinámicos en tiempo real"`
 
 ---
@@ -84,13 +84,13 @@ Genera una infografía visual con el siguiente concepto y estructura. El objetiv
 
 Representa una balanza o diagrama comparativo de dos columnas con estilo pizarra:
 
-| MCP (rojo / trazo activo)  | Skills (gris / trazo pasivo)         |
-|----------------------------|--------------------------------------|
-| Funcionalidad              | Conocimiento                         |
-| "Poder hacer"              | "Saber cómo"                         |
-| Herramientas               | Seguir guías de arquitectura         |                   
-| Conectarse a terceros      | Aplicar estilos de código limpios    |
-| Leer una base de datos     |                                      |                                                             
+| MCP (rojo / trazo activo)       | Skills (gris / trazo pasivo)              |
+|---------------------------------|-------------------------------------------|
+| Funcionalidad                   | Conocimiento                              |
+| "Poder hacer"                   | "Saber cómo"                              |
+| Consultar DB2 for i en vivo     | `rpg-best-practices` → código limpio      |
+| Monitorear jobs batch AS400     | `rpg-documentation` → cabeceras y trazas  |
+| Crear estructura TOBi por nro. de pase | `rpg-troubleshooting` → análisis JOBLOG |
 
 
 - Incluir logo BAC en esquina superior derecha.
