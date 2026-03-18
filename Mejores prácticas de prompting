@@ -1,0 +1,544 @@
+# Mejores prácticas de prompting
+
+Técnicas de ingeniería de prompts para los últimos modelos de Claude, incluyendo Claude Opus 4.6, Claude Sonnet 4.5 y Claude Haiku 4.5.
+
+---
+
+Esta guía proporciona técnicas de ingeniería de prompts para los últimos modelos de Claude, incluyendo Claude Opus 4.6, Claude Sonnet 4.5 y Claude Haiku 4.5. Estos modelos han sido entrenados para seguir instrucciones de manera más precisa que generaciones anteriores de modelos Claude.
+<Tip>
+  Para una descripción general de las capacidades del modelo, consulta la [descripción general de modelos](/docs/es/about-claude/models/overview). Para obtener detalles sobre las novedades en Claude 4.6, consulta [Novedades en Claude 4.6](/docs/es/about-claude/models/whats-new-claude-4-6). Para obtener orientación sobre migración, consulta la [Guía de migración](/docs/es/about-claude/models/migration-guide).
+</Tip>
+
+## Principios generales
+
+### Sé explícito con tus instrucciones
+
+Claude responde bien a instrucciones claras y explícitas. Ser específico sobre tu resultado deseado puede ayudar a mejorar los resultados. Si deseas un comportamiento "más allá de lo básico", solicítalo explícitamente en lugar de confiar en que el modelo lo deduzca de prompts vagos.
+
+<section title="Ejemplo: Crear un panel de análisis">
+
+**Menos efectivo:**
+```text
+Crear un panel de análisis
+```
+
+**Más efectivo:**
+```text
+Crear un panel de análisis. Incluye tantas características e interacciones relevantes como sea posible. Ve más allá de lo básico para crear una implementación completamente funcional.
+```
+
+</section>
+
+### Añade contexto para mejorar el rendimiento
+
+Proporcionar contexto o motivación detrás de tus instrucciones, como explicar a Claude por qué tal comportamiento es importante, puede ayudar a Claude a entender mejor tus objetivos y entregar respuestas más dirigidas.
+
+<section title="Ejemplo: Preferencias de formato">
+
+**Menos efectivo:**
+```text
+NUNCA uses puntos suspensivos
+```
+
+**Más efectivo:**
+```text
+Tu respuesta será leída en voz alta por un motor de síntesis de voz, así que nunca uses puntos suspensivos ya que el motor de síntesis de voz no sabrá cómo pronunciarlos.
+```
+
+</section>
+
+Claude es lo suficientemente inteligente para generalizar a partir de la explicación.
+
+### Sé vigilante con ejemplos y detalles
+
+Claude presta mucha atención a los detalles y ejemplos como parte de sus capacidades precisas de seguimiento de instrucciones. Asegúrate de que tus ejemplos se alineen con los comportamientos que deseas fomentar y minimiza los comportamientos que deseas evitar.
+
+### Razonamiento de largo horizonte y seguimiento de estado
+
+Los últimos modelos de Claude destacan en tareas de razonamiento de largo horizonte con capacidades excepcionales de seguimiento de estado. Claude mantiene la orientación a lo largo de sesiones extendidas enfocándose en el progreso incremental, realizando avances constantes en pocas cosas a la vez en lugar de intentar hacerlo todo de una vez. Esta capacidad emerge especialmente en múltiples ventanas de contexto o iteraciones de tareas, donde Claude puede trabajar en una tarea compleja, guardar el estado y continuar con una ventana de contexto nueva.
+
+#### Conciencia del contexto y flujos de trabajo de múltiples ventanas
+
+Los modelos Claude Opus 4.6 y Claude 4.5 cuentan con [conciencia del contexto](/docs/es/build-with-claude/context-windows#context-awareness-in-claude-sonnet-45-and-haiku-45), permitiendo que el modelo rastree su ventana de contexto restante (es decir, "presupuesto de tokens") a lo largo de una conversación. Esto permite que Claude ejecute tareas y gestione el contexto de manera más efectiva al entender cuánto espacio tiene para trabajar.
+
+**Gestión de límites de contexto:**
+
+Si estás usando Claude en un arnés de agente que compacta el contexto o permite guardar el contexto en archivos externos (como en Claude Code), sugerimos añadir esta información a tu prompt para que Claude pueda comportarse en consecuencia. De lo contrario, Claude puede a veces intentar naturalmente terminar el trabajo cuando se acerca al límite del contexto. A continuación se muestra un ejemplo de prompt:
+
+```text Prompt de ejemplo
+Tu ventana de contexto será compactada automáticamente cuando se acerque a su límite, permitiéndote continuar trabajando indefinidamente desde donde lo dejaste. Por lo tanto, no detengas tareas temprano debido a preocupaciones sobre el presupuesto de tokens. Cuando te acerques a tu límite de presupuesto de tokens, guarda tu progreso actual y estado en memoria antes de que la ventana de contexto se actualice. Siempre sé lo más persistente y autónomo posible y completa las tareas completamente, incluso si el final de tu presupuesto se acerca. Nunca detengas artificialmente ninguna tarea temprano independientemente del contexto restante.
+```
+
+La [herramienta de memoria](/docs/es/agents-and-tools/tool-use/memory-tool) se empareja naturalmente con la conciencia del contexto para transiciones de contexto sin problemas.
+
+#### Flujos de trabajo de múltiples ventanas de contexto
+
+Para tareas que abarcan múltiples ventanas de contexto:
+
+1. **Usa un prompt diferente para la primera ventana de contexto**: Usa la primera ventana de contexto para configurar un marco (escribir pruebas, crear scripts de configuración), luego usa futuras ventanas de contexto para iterar en una lista de tareas.
+
+2. **Haz que el modelo escriba pruebas en un formato estructurado**: Pide a Claude que cree pruebas antes de comenzar el trabajo y mantén un registro de ellas en un formato estructurado (por ejemplo, `tests.json`). Esto conduce a una mejor capacidad a largo plazo para iterar. Recuerda a Claude la importancia de las pruebas: "Es inaceptable eliminar o editar pruebas porque esto podría llevar a funcionalidad faltante o defectuosa."
+
+3. **Configura herramientas de calidad de vida**: Anima a Claude a crear scripts de configuración (por ejemplo, `init.sh`) para iniciar servidores correctamente, ejecutar suites de pruebas y linters. Esto previene trabajo repetido cuando se continúa desde una ventana de contexto nueva.
+
+4. **Comenzar de nuevo vs compactar**: Cuando se borra una ventana de contexto, considera comenzar con una ventana de contexto completamente nueva en lugar de usar compactación. Los últimos modelos de Claude son extremadamente efectivos en descubrir estado del sistema de archivos local. En algunos casos, es posible que desees aprovechar esto sobre la compactación. Sé prescriptivo sobre cómo debe comenzar:
+   - "Llama a pwd; solo puedes leer y escribir archivos en este directorio."
+   - "Revisa progress.txt, tests.json y los registros de git."
+   - "Ejecuta manualmente una prueba de integración fundamental antes de pasar a implementar nuevas características."
+
+5. **Proporciona herramientas de verificación**: A medida que crece la duración de las tareas autónomas, Claude necesita verificar la corrección sin retroalimentación humana continua. Herramientas como el servidor Playwright MCP o capacidades de uso de computadora para probar interfaces de usuario son útiles.
+
+6. **Anima el uso completo del contexto**: Solicita a Claude que complete componentes de manera eficiente antes de pasar al siguiente:
+
+```text Prompt de ejemplo
+Esta es una tarea muy larga, así que puede ser beneficioso planificar tu trabajo claramente. Se recomienda pasar todo tu contexto de salida trabajando en la tarea - solo asegúrate de no quedarte sin contexto con trabajo significativo sin confirmar. Continúa trabajando sistemáticamente hasta que hayas completado esta tarea.
+```
+
+#### Mejores prácticas de gestión de estado
+
+- **Usa formatos estructurados para datos de estado**: Cuando rastrees información estructurada (como resultados de pruebas o estado de tareas), usa JSON u otros formatos estructurados para ayudar a Claude a entender requisitos de esquema
+- **Usa texto no estructurado para notas de progreso**: Las notas de progreso de forma libre funcionan bien para rastrear el progreso general y el contexto
+- **Usa git para rastreo de estado**: Git proporciona un registro de lo que se ha hecho y puntos de control que pueden ser restaurados. Los últimos modelos de Claude funcionan especialmente bien usando git para rastrear estado en múltiples sesiones.
+- **Enfatiza el progreso incremental**: Pide explícitamente a Claude que mantenga un registro de su progreso y se enfoque en trabajo incremental
+
+<section title="Ejemplo: Rastreo de estado">
+
+```json
+// Archivo de estado estructurado (tests.json)
+{
+  "tests": [
+    {"id": 1, "name": "authentication_flow", "status": "passing"},
+    {"id": 2, "name": "user_management", "status": "failing"},
+    {"id": 3, "name": "api_endpoints", "status": "not_started"}
+  ],
+  "total": 200,
+  "passing": 150,
+  "failing": 25,
+  "not_started": 25
+}
+```
+
+```text
+// Notas de progreso (progress.txt)
+Progreso de la sesión 3:
+- Se corrigió la validación del token de autenticación
+- Se actualizó el modelo de usuario para manejar casos límite
+- Siguiente: investigar fallos de prueba de user_management (prueba #2)
+- Nota: No elimines pruebas ya que esto podría llevar a funcionalidad faltante
+```
+
+</section>
+
+### Estilo de comunicación
+
+Los últimos modelos de Claude tienen un estilo de comunicación más conciso y natural en comparación con modelos anteriores:
+
+- **Más directo y fundamentado**: Proporciona reportes de progreso basados en hechos en lugar de actualizaciones auto-celebratorias
+- **Más conversacional**: Ligeramente más fluido y coloquial, menos parecido a una máquina
+- **Menos verboso**: Puede omitir resúmenes detallados por eficiencia a menos que se solicite lo contrario
+
+Este estilo de comunicación refleja con precisión lo que se ha logrado sin elaboración innecesaria.
+
+## Orientación para situaciones específicas
+
+### Equilibra la verbosidad
+
+Los últimos modelos de Claude tienden hacia la eficiencia y pueden omitir resúmenes verbales después de llamadas a herramientas, saltando directamente a la siguiente acción. Aunque esto crea un flujo de trabajo simplificado, es posible que prefieras más visibilidad en su proceso de razonamiento.
+
+Si deseas que Claude proporcione actualizaciones mientras trabaja:
+
+```text Prompt de ejemplo
+Después de completar una tarea que implica el uso de herramientas, proporciona un resumen rápido del trabajo que has realizado.
+```
+
+### Patrones de uso de herramientas
+
+Los últimos modelos de Claude están entrenados para seguimiento preciso de instrucciones y se benefician de una dirección explícita para usar herramientas específicas. Si dices "¿puedes sugerir algunos cambios?", Claude a veces proporcionará sugerencias en lugar de implementarlas, incluso si hacer cambios podría ser lo que pretendías.
+
+Para que Claude tome acción, sé más explícito:
+
+<section title="Ejemplo: Instrucciones explícitas">
+
+**Menos efectivo (Claude solo sugerirá):**
+```text
+¿Puedes sugerir algunos cambios para mejorar esta función?
+```
+
+**Más efectivo (Claude hará los cambios):**
+```text
+Cambia esta función para mejorar su rendimiento.
+```
+
+O:
+```text
+Haz estas ediciones al flujo de autenticación.
+```
+
+</section>
+
+Para hacer que Claude sea más proactivo en tomar acciones por defecto, puedes añadir esto a tu prompt del sistema:
+
+```text Prompt de ejemplo para acción proactiva
+<default_to_action>
+Por defecto, implementa cambios en lugar de solo sugerirlos. Si la intención del usuario es poco clara, deduce la acción más útil probable y procede, usando herramientas para descubrir cualquier detalle faltante en lugar de adivinar. Intenta deducir la intención del usuario sobre si una llamada a herramienta (por ejemplo, edición o lectura de archivo) es intencional o no, y actúa en consecuencia.
+</default_to_action>
+```
+
+Por otro lado, si deseas que el modelo sea más cauteloso por defecto, menos propenso a saltar directamente a implementaciones, y solo tome acción si se solicita, puedes dirigir este comportamiento con un prompt como el siguiente:
+
+```text Prompt de ejemplo para acción conservadora
+<do_not_act_before_instructions>
+No saltes a la implementación o cambies archivos a menos que se te instruya claramente a hacer cambios. Cuando la intención del usuario es ambigua, por defecto proporciona información, realiza investigación y proporciona recomendaciones en lugar de tomar acción. Solo procede con ediciones, modificaciones o implementaciones cuando el usuario las solicita explícitamente.
+</do_not_act_before_instructions>
+```
+
+### Uso de herramientas y activación
+
+Claude Opus 4.5 y Claude Opus 4.6 son más receptivos al prompt del sistema que modelos anteriores. Si tus prompts fueron diseñados para reducir el subtriggering en herramientas o habilidades, estos modelos pueden ahora overtrigger. La solución es reducir cualquier lenguaje agresivo. Donde podrías haber dicho "CRÍTICO: DEBES usar esta herramienta cuando...", puedes usar prompting más normal como "Usa esta herramienta cuando...".
+
+### Equilibrio entre autonomía y seguridad
+
+Sin orientación, Claude Opus 4.6 puede tomar acciones que son difíciles de revertir o afectan sistemas compartidos, como eliminar archivos, force-pushing o publicar en servicios externos. Si deseas que Claude Opus 4.6 confirme antes de tomar acciones potencialmente riesgosas, añade orientación a tu prompt:
+
+```text Prompt de ejemplo
+Considera la reversibilidad e impacto potencial de tus acciones. Se te anima a tomar acciones locales y reversibles como editar archivos o ejecutar pruebas, pero para acciones que son difíciles de revertir, afectan sistemas compartidos o podrían ser destructivas, pregunta al usuario antes de proceder.
+
+Ejemplos de acciones que justifican confirmación:
+- Operaciones destructivas: eliminar archivos o ramas, soltar tablas de base de datos, rm -rf
+- Operaciones difíciles de revertir: git push --force, git reset --hard, enmendar commits publicados
+- Operaciones visibles para otros: empujar código, comentar en PRs/issues, enviar mensajes, modificar infraestructura compartida
+
+Cuando encuentres obstáculos, no uses acciones destructivas como atajo. Por ejemplo, no eludas controles de seguridad (por ejemplo --no-verify) o descartes archivos desconocidos que podrían ser trabajo en progreso.
+```
+
+### Pensamiento excesivo y minuciosidad excesiva
+
+Claude Opus 4.6 realiza significativamente más exploración inicial que modelos anteriores, especialmente en configuraciones de `effort` más altas. Este trabajo inicial a menudo ayuda a optimizar los resultados finales, pero el modelo puede reunir contexto extenso o perseguir múltiples líneas de investigación sin ser solicitado. Si tus prompts previamente alentaban al modelo a ser más minucioso, debes ajustar esa orientación para Claude Opus 4.6:
+
+- **Reemplaza valores predeterminados generales con instrucciones más dirigidas.** En lugar de "Por defecto usa \[herramienta\]," añade orientación como "Usa \[herramienta\] cuando mejoraría tu comprensión del problema."
+- **Elimina el over-prompting.** Las herramientas que undertriggered en modelos anteriores probablemente triggeren apropiadamente ahora. Instrucciones como "Si tienes dudas, usa \[herramienta\]" causarán overtriggering.
+- **Usa effort como fallback.** Si Claude continúa siendo demasiado agresivo, usa una configuración más baja para `effort`.
+
+En algunos casos, Claude Opus 4.6 puede pensar extensamente, lo que puede inflar tokens de pensamiento y ralentizar respuestas. Si este comportamiento es indeseable, puedes añadir instrucciones explícitas para restringir su razonamiento, o puedes bajar la configuración de `effort` para reducir el pensamiento general y el uso de tokens.
+
+```text Prompt de ejemplo
+Cuando estés decidiendo cómo abordar un problema, elige un enfoque y comprométete con él. Evita revisar decisiones a menos que encuentres información nueva que contradiga directamente tu razonamiento. Si estás sopesando dos enfoques, elige uno y llévalo a cabo. Siempre puedes corregir el curso más tarde si el enfoque elegido falla.
+```
+
+### Controla el formato de respuestas
+
+Hay algunas formas que hemos encontrado que son particularmente efectivas para dirigir el formato de salida:
+
+1. **Dile a Claude qué hacer en lugar de qué no hacer**
+
+   - En lugar de: "No uses markdown en tu respuesta"
+   - Intenta: "Tu respuesta debe estar compuesta de párrafos de prosa que fluyan suavemente."
+
+2. **Usa indicadores de formato XML**
+
+   - Intenta: "Escribe las secciones de prosa de tu respuesta en etiquetas \<smoothly_flowing_prose_paragraphs\>."
+
+3. **Haz coincidir tu estilo de prompt con la salida deseada**
+
+   El estilo de formato usado en tu prompt puede influir en el estilo de respuesta de Claude. Si aún experimentas problemas de dirigibilidad con el formato de salida, recomendamos que hagas coincidir tu estilo de prompt con tu estilo de salida deseado tanto como sea posible. Por ejemplo, eliminar markdown de tu prompt puede reducir el volumen de markdown en la salida.
+
+4. **Usa prompts detallados para preferencias de formato específicas**
+
+   Para más control sobre el uso de markdown y formato, proporciona orientación explícita:
+
+```text Prompt de ejemplo para minimizar markdown
+<avoid_excessive_markdown_and_bullet_points>
+Cuando escribas reportes, documentos, explicaciones técnicas, análisis o cualquier contenido de forma larga, escribe en prosa clara y fluida usando párrafos y oraciones completas. Usa saltos de párrafo estándar para organización y reserva markdown principalmente para `código en línea`, bloques de código (```...```), y encabezados simples (###, y ###). Evita usar **negrita** e *itálicas*.
+
+NO uses listas ordenadas (1. ...) o listas desordenadas (*) a menos que: a) estés presentando elementos verdaderamente discretos donde un formato de lista es la mejor opción, o b) el usuario solicite explícitamente una lista o ranking
+
+En lugar de listar elementos con viñetas o números, incorpóralos naturalmente en oraciones. Esta orientación se aplica especialmente a la escritura técnica. Usar prosa en lugar de formato excesivo mejorará la satisfacción del usuario. NUNCA generes una serie de puntos de viñeta demasiado cortos.
+
+Tu objetivo es texto legible y fluido que guíe al lector naturalmente a través de ideas en lugar de fragmentar información en puntos aislados.
+</avoid_excessive_markdown_and_bullet_points>
+```
+
+### Investigación y recopilación de información
+
+Los últimos modelos de Claude demuestran capacidades excepcionales de búsqueda agentica y pueden encontrar y sintetizar información de múltiples fuentes de manera efectiva. Para resultados de investigación óptimos:
+
+1. **Proporciona criterios de éxito claros**: Define qué constituye una respuesta exitosa a tu pregunta de investigación
+
+2. **Anima la verificación de fuentes**: Pide a Claude que verifique información en múltiples fuentes
+
+3. **Para tareas de investigación complejas, usa un enfoque estructurado**:
+
+```text Prompt de ejemplo para investigación compleja
+Busca esta información de manera estructurada. Mientras recopiles datos, desarrolla varias hipótesis competidoras. Rastrea tus niveles de confianza en tus notas de progreso para mejorar la calibración. Autocrítica regularmente tu enfoque y plan. Actualiza un archivo de árbol de hipótesis o notas de investigación para persistir información y proporcionar transparencia. Desglosa esta tarea de investigación compleja sistemáticamente.
+```
+
+Este enfoque estructurado permite que Claude encuentre y sintetice prácticamente cualquier pieza de información e itere críticamente sus hallazgos, sin importar el tamaño del corpus.
+
+### Orquestación de subagentes
+
+Los últimos modelos de Claude demuestran capacidades significativamente mejoradas de orquestación nativa de subagentes. Estos modelos pueden reconocer cuándo las tareas se beneficiarían de delegar trabajo a subagentes especializados y hacerlo de manera proactiva sin requerir instrucción explícita.
+
+Para aprovechar este comportamiento:
+
+1. **Asegura herramientas de subagente bien definidas**: Ten herramientas de subagente disponibles y descritas en definiciones de herramientas
+2. **Deja que Claude orqueste naturalmente**: Claude delegará apropiadamente sin instrucción explícita
+3. **Observa el uso excesivo**: Claude Opus 4.6 tiene una fuerte predilección por subagentes y puede generarlos en situaciones donde un enfoque más simple y directo sería suficiente. Por ejemplo, el modelo puede generar subagentes para exploración de código cuando una llamada grep directa es más rápida y suficiente.
+
+Si ves uso excesivo de subagentes, añade orientación explícita sobre cuándo los subagentes son y no son justificados:
+
+```text Prompt de ejemplo para uso de subagentes
+Usa subagentes cuando las tareas pueden ejecutarse en paralelo, requieren contexto aislado, o implican flujos de trabajo independientes que no necesitan compartir estado. Para tareas simples, operaciones secuenciales, ediciones de un solo archivo, o tareas donde necesitas mantener contexto a través de pasos, trabaja directamente en lugar de delegar.
+```
+
+### Autoconocimiento del modelo
+
+Si deseas que Claude se identifique correctamente en tu aplicación o use strings de API específicas:
+
+```text Prompt de ejemplo para identidad del modelo
+El asistente es Claude, creado por Anthropic. El modelo actual es Claude Opus 4.6.
+```
+
+Para aplicaciones impulsadas por LLM que necesitan especificar strings de modelo:
+
+```text Prompt de ejemplo para string de modelo
+Cuando se necesita un LLM, por favor por defecto a Claude Opus 4.6 a menos que el usuario solicite lo contrario. El string de modelo exacto para Claude Opus 4.6 es claude-opus-4-6.
+```
+
+### Sensibilidad del pensamiento
+
+Cuando el pensamiento extendido está deshabilitado, Claude Opus 4.5 es particularmente sensible a la palabra "think" y sus variantes. Recomendamos reemplazar "think" con palabras alternativas que transmitan significado similar, como "consider," "believe," y "evaluate."
+
+### Aprovecha las capacidades de pensamiento e pensamiento intercalado
+
+Los últimos modelos de Claude ofrecen capacidades de pensamiento que pueden ser especialmente útiles para tareas que implican reflexión después del uso de herramientas o razonamiento complejo de múltiples pasos. Puedes guiar su pensamiento inicial o intercalado para mejores resultados.
+
+Claude Opus 4.6 usa [pensamiento adaptativo](/docs/es/build-with-claude/adaptive-thinking) (`thinking: {type: "adaptive"}`), donde Claude decide dinámicamente cuándo y cuánto pensar. Claude calibra su pensamiento basado en dos factores: el parámetro `effort` y la complejidad de la consulta. El esfuerzo más alto provoca más pensamiento, y las consultas más complejas hacen lo mismo. En consultas más fáciles que no requieren pensamiento, el modelo responde directamente. En evaluaciones internas, el pensamiento adaptativo impulsa de manera confiable mejor rendimiento que el pensamiento extendido, y recomendamos pasar al pensamiento adaptativo para obtener las respuestas más inteligentes. Los modelos más antiguos usan modo de pensamiento manual con `budget_tokens`.
+
+Puedes guiar el comportamiento de pensamiento de Claude:
+
+```text Prompt de ejemplo
+Después de recibir resultados de herramientas, reflexiona cuidadosamente sobre su calidad y determina los pasos óptimos siguientes antes de proceder. Usa tu pensamiento para planificar e iterar basado en esta información nueva, y luego toma la mejor acción siguiente.
+```
+
+El comportamiento de activación para el pensamiento adaptativo es promptable. Si encuentras que el modelo piensa más a menudo de lo que deseas, lo que puede ocurrir con prompts del sistema grandes o complejos, añade orientación para dirigirlo:
+
+```text Prompt de ejemplo
+El pensamiento extendido añade latencia y solo debe usarse cuando mejorará significativamente la calidad de la respuesta - típicamente para problemas que requieren razonamiento de múltiples pasos. Cuando tengas dudas, responde directamente.
+```
+
+Si estás migrando desde [pensamiento extendido](/docs/es/build-with-claude/extended-thinking) con `budget_tokens`, reemplaza tu configuración de pensamiento y mueve el control de presupuesto a `effort`:
+
+```python Antes (pensamiento extendido, modelos más antiguos)
+client.messages.create(
+    model="claude-sonnet-4-5-20250929",
+    max_tokens=64000,
+    thinking={"type": "enabled", "budget_tokens": 32000},
+    messages=[{"role": "user", "content": "..."}],
+)
+```
+
+```python Después (pensamiento adaptativo)
+client.messages.create(
+    model="claude-opus-4-6",
+    max_tokens=64000,
+    thinking={"type": "adaptive"},
+    output_config={"effort": "high"},  # o max, medium, low
+    messages=[{"role": "user", "content": "..."}],
+)
+```
+
+Si no estás usando pensamiento extendido, no se requieren cambios. El pensamiento está deshabilitado por defecto cuando omites el parámetro `thinking`.
+
+<Info>
+  Para más información sobre capacidades de pensamiento, consulta [Pensamiento extendido](/docs/es/build-with-claude/extended-thinking) y [Pensamiento adaptativo](/docs/es/build-with-claude/adaptive-thinking).
+</Info>
+
+### Creación de documentos
+
+Los últimos modelos de Claude destacan en la creación de presentaciones, animaciones y documentos visuales con un toque creativo impresionante y un fuerte seguimiento de instrucciones. Los modelos producen salida pulida y utilizable en la mayoría de los casos en el primer intento.
+
+Para mejores resultados con creación de documentos:
+
+```text Prompt de ejemplo
+Crea una presentación profesional sobre [tema]. Incluye elementos de diseño reflexivos, jerarquía visual y animaciones atractivas donde sea apropiado.
+```
+
+### Capacidades de visión mejoradas
+
+Claude Opus 4.5 y Claude Opus 4.6 tienen capacidades de visión mejoradas en comparación con modelos Claude anteriores. Funcionan mejor en tareas de procesamiento de imágenes y extracción de datos, particularmente cuando hay múltiples imágenes presentes en el contexto. Estas mejoras se trasladan al uso de computadora, donde los modelos pueden interpretar de manera más confiable capturas de pantalla y elementos de interfaz de usuario. También puedes usar estos modelos para analizar videos dividiéndolos en fotogramas.
+
+Una técnica que hemos encontrado efectiva para impulsar aún más el rendimiento es dar a Claude una herramienta de recorte o [habilidad](/docs/es/agents-and-tools/agent-skills/overview). Hemos visto mejora consistente en evaluaciones de imágenes cuando Claude puede "hacer zoom" en regiones relevantes de una imagen. Hemos preparado un cookbook para la herramienta de recorte [aquí](https://platform.claude.com/cookbook/multimodal-crop-tool).
+
+### Optimiza llamadas de herramientas paralelas
+
+Los últimos modelos de Claude destacan en ejecución de herramientas paralelas. Estos modelos:
+
+- Ejecutan múltiples búsquedas especulativas durante la investigación
+- Leen varios archivos a la vez para construir contexto más rápido
+- Ejecutan comandos bash en paralelo (lo que incluso puede saturar el rendimiento del sistema)
+
+Este comportamiento es fácilmente dirigible. Aunque el modelo tiene una alta tasa de éxito en llamadas de herramientas paralelas sin prompting, puedes impulsar esto a ~100% o ajustar el nivel de agresión:
+
+```text Prompt de ejemplo para máxima eficiencia paralela
+<use_parallel_tool_calls>
+Si tienes la intención de llamar a múltiples herramientas y no hay dependencias entre las llamadas a herramientas, haz todas las llamadas a herramientas independientes en paralelo. Prioriza llamar a herramientas simultáneamente siempre que las acciones puedan hacerse en paralelo en lugar de secuencialmente. Por ejemplo, cuando lees 3 archivos, ejecuta 3 llamadas a herramientas en paralelo para leer los 3 archivos en contexto al mismo tiempo. Maximiza el uso de llamadas a herramientas paralelas donde sea posible para aumentar velocidad y eficiencia. Sin embargo, si algunas llamadas a herramientas dependen de llamadas anteriores para informar valores dependientes como los parámetros, NO llames a estas herramientas en paralelo y en su lugar llámalas secuencialmente. Nunca uses placeholders o adivines parámetros faltantes en llamadas a herramientas.
+</use_parallel_tool_calls>
+```
+
+```text Prompt de ejemplo para reducir ejecución paralela
+Ejecuta operaciones secuencialmente con breves pausas entre cada paso para asegurar estabilidad.
+```
+
+### Reduce la creación de archivos en codificación agentica
+
+Los últimos modelos de Claude pueden a veces crear nuevos archivos para propósitos de prueba e iteración, particularmente cuando se trabaja con código. Este enfoque permite que Claude use archivos, especialmente scripts de python, como un 'bloc de notas temporal' antes de guardar su salida final. Usar archivos temporales puede mejorar resultados particularmente para casos de uso de codificación agentica.
+
+Si prefieres minimizar la creación neta de nuevos archivos, puedes instruir a Claude que limpie después de sí mismo:
+
+```text Prompt de ejemplo
+Si creas cualquier archivo temporal nuevo, scripts o archivos auxiliares para iteración, limpia estos archivos eliminándolos al final de la tarea.
+```
+
+### Exceso de entusiasmo
+
+Claude Opus 4.5 y Claude Opus 4.6 tienen una tendencia a sobre-ingenierizar creando archivos extra, añadiendo abstracciones innecesarias, o construyendo flexibilidad que no fue solicitada. Si ves este comportamiento indeseable, añade orientación específica para mantener soluciones mínimas.
+
+Por ejemplo:
+
+```text Prompt de ejemplo para minimizar sobre-ingeniería
+Evita la sobre-ingeniería. Solo haz cambios que sean directamente solicitados o claramente necesarios. Mantén soluciones simples y enfocadas:
+
+- Alcance: No añadas características, refactorices código, o hagas "mejoras" más allá de lo solicitado. Una corrección de bug no necesita código circundante limpiado. Una característica simple no necesita configurabilidad extra.
+
+- Documentación: No añadas docstrings, comentarios o anotaciones de tipo a código que no cambiaste. Solo añade comentarios donde la lógica no sea evidente por sí misma.
+
+- Codificación defensiva: No añadas manejo de errores, fallbacks o validación para escenarios que no pueden ocurrir. Confía en garantías de código interno y framework. Solo valida en límites del sistema (entrada del usuario, APIs externas).
+
+- Abstracciones: No crees helpers, utilidades o abstracciones para operaciones de una sola vez. No diseñes para requisitos futuros hipotéticos. La cantidad correcta de complejidad es el mínimo necesario para la tarea actual.
+```
+
+### Diseño de frontend
+
+Claude Opus 4.5 y Claude Opus 4.6 destacan en la construcción de aplicaciones web complejas y del mundo real con un fuerte diseño de frontend. Sin embargo, sin orientación, los modelos pueden por defecto a patrones genéricos que crean lo que los usuarios llaman la estética "AI slop". Para crear frontends distintivos y creativos que sorprendan y deleiten:
+
+<Tip>
+Para una guía detallada sobre mejora del diseño de frontend, consulta nuestro artículo de blog sobre [mejora del diseño de frontend a través de habilidades](https://www.claude.com/blog/improving-frontend-design-through-skills).
+</Tip>
+
+Aquí hay un fragmento de prompt del sistema que puedes usar para alentar mejor diseño de frontend:
+
+```text Prompt de ejemplo para estética de frontend
+<frontend_aesthetics>
+Tiendes a converger hacia salidas genéricas y "en distribución". En diseño de frontend, esto crea lo que los usuarios llaman la estética "AI slop". Evita esto: haz frontends creativos y distintivos que sorprendan y deleiten.
+
+Enfócate en:
+- Tipografía: Elige fuentes que sean hermosas, únicas e interesantes. Evita fuentes genéricas como Arial e Inter; opta en su lugar por opciones distintivas que eleven la estética del frontend.
+- Color y Tema: Comprométete con una estética coherente. Usa variables CSS para consistencia. Los colores dominantes con acentos agudos superan a paletas tímidas y distribuidas uniformemente. Extrae inspiración de temas de IDE y estéticas culturales.
+- Movimiento: Usa animaciones para efectos e interacciones micro. Prioriza soluciones solo CSS para HTML. Usa librería Motion para React cuando esté disponible. Enfócate en momentos de alto impacto: una carga de página bien orquestada con revelaciones escalonadas (animation-delay) crea más deleite que micro-interacciones dispersas.
+- Fondos: Crea atmósfera y profundidad en lugar de por defecto a colores sólidos. Superpone gradientes CSS, usa patrones geométricos, o añade efectos contextuales que coincidan con la estética general.
+
+Evita estéticas genéricas generadas por IA:
+- Familias de fuentes sobreutilizadas (Inter, Roboto, Arial, fuentes del sistema)
+- Esquemas de color cliché (particularmente gradientes púrpura sobre fondos blancos)
+- Layouts y patrones de componentes predecibles
+- Diseño genérico que carece de carácter específico del contexto
+
+Interpreta creativamente y haz opciones inesperadas que se sientan genuinamente diseñadas para el contexto. Varía entre temas claros y oscuros, diferentes fuentes, diferentes estéticas. Aún tiendes a converger en opciones comunes (Space Grotesk, por ejemplo) a través de generaciones. Evita esto: ¡es crítico que pienses fuera de la caja!
+</frontend_aesthetics>
+```
+
+También puedes referirte a la habilidad completa [aquí](https://github.com/anthropics/claude-code/blob/main/plugins/frontend-design/skills/frontend-design/SKILL.md).
+
+### Evita enfocarse en pasar pruebas y hardcoding
+
+Claude a veces puede enfocarse demasiado en hacer pasar pruebas a expensas de soluciones más generales, o puede usar workarounds como scripts auxiliares para refactorización compleja en lugar de usar herramientas estándar directamente. Para prevenir este comportamiento y asegurar soluciones robustas y generalizables:
+
+```text Prompt de ejemplo
+Por favor escribe una solución de alta calidad y propósito general usando las herramientas estándar disponibles. No crees scripts auxiliares o workarounds para realizar la tarea de manera más eficiente. Implementa una solución que funcione correctamente para todas las entradas válidas, no solo los casos de prueba. No hardcodees valores o crees soluciones que solo funcionen para entradas de prueba específicas. En su lugar, implementa la lógica actual que resuelve el problema de manera general.
+
+Enfócate en entender los requisitos del problema e implementar el algoritmo correcto. Las pruebas están ahí para verificar corrección, no para definir la solución. Proporciona una implementación con principios que siga mejores prácticas y principios de diseño de software.
+
+Si la tarea es irrazonable o infactible, o si alguna de las pruebas es incorrecta, por favor infórmame en lugar de trabajar alrededor de ellas. La solución debe ser robusta, mantenible y extensible.
+```
+
+### Minimiza alucinaciones en codificación agentica
+
+Los últimos modelos de Claude son menos propensos a alucinaciones y dan respuestas más precisas, fundamentadas e inteligentes basadas en el código. Para alentar este comportamiento aún más y minimizar alucinaciones:
+
+```text Prompt de ejemplo
+<investigate_before_answering>
+Nunca especules sobre código que no has abierto. Si el usuario referencia un archivo específico, DEBES leer el archivo antes de responder. Asegúrate de investigar y leer archivos relevantes ANTES de responder preguntas sobre la base de código. Nunca hagas ninguna afirmación sobre código antes de investigar a menos que estés seguro de la respuesta correcta - da respuestas fundamentadas y libres de alucinaciones.
+</investigate_before_answering>
+```
+
+### Migración desde respuestas rellenadas previamente
+
+A partir de Claude Opus 4.6, las respuestas rellenadas previamente en el último turno del asistente ya no son compatibles. La inteligencia del modelo y el seguimiento de instrucciones han avanzado de tal manera que la mayoría de los casos de uso del relleno previo ya no lo requieren. Los modelos existentes continuarán siendo compatibles con rellenos previos, y agregar mensajes del asistente en otros lugares de la conversación no se ve afectado.
+
+Aquí hay escenarios comunes de relleno previo y cómo migrar lejos de ellos:
+
+<section title="Controlar el formato de salida">
+
+Los rellenos previos se han utilizado para forzar formatos de salida específicos como JSON/YAML, clasificación y patrones similares donde el relleno previo obliga a Claude a una estructura particular.
+
+**Migración:** La característica [Structured Outputs](/docs/es/build-with-claude/structured-outputs) está diseñada específicamente para obligar a las respuestas de Claude a seguir un esquema dado. Intenta simplemente pedirle al modelo que se conforme a tu estructura de salida primero, ya que los modelos más nuevos pueden coincidir de manera confiable con esquemas complejos cuando se les indica que lo hagan, especialmente si se implementa con reintentos. Para tareas de clasificación, utiliza herramientas con un campo enum que contenga tus etiquetas válidas o salidas estructuradas.
+
+</section>
+
+<section title="Eliminar preámbulos">
+
+Los rellenos previos como `Here is the requested summary:\n` se utilizaban para omitir texto introductorio.
+
+**Migración:** Utiliza instrucciones directas en el mensaje del sistema: "Responde directamente sin preámbulo. No comiences con frases como 'Aquí está...', 'Basado en...', etc." Alternativamente, dirige al modelo a generar dentro de etiquetas XML, utiliza salidas estructuradas o utiliza llamadas de herramientas. Si ocasionalmente se cuela un preámbulo, elimínalo en el post-procesamiento.
+
+</section>
+
+<section title="Evitar rechazos incorrectos">
+
+Los rellenos previos se utilizaban para eludir rechazos innecesarios.
+
+**Migración:** Claude ahora es mucho mejor en rechazos apropiados. Las indicaciones claras dentro del mensaje `user` sin relleno previo deberían ser suficientes.
+
+</section>
+
+<section title="Continuaciones">
+
+Los rellenos previos se utilizaban para continuar completaciones parciales, reanudar respuestas interrumpidas o continuar donde dejó una generación anterior.
+
+**Migración:** Mueve la continuación al mensaje del usuario e incluye el texto final de la respuesta interrumpida: "Tu respuesta anterior fue interrumpida y terminó con \`[previous_response]\`. Continúa desde donde lo dejaste." Si esto es parte del manejo de errores o manejo de respuestas incompletas y no hay penalización de UX, reintenta la solicitud.
+
+</section>
+
+<section title="Hidratación de contexto y consistencia de rol">
+
+Los rellenos previos se utilizaban para asegurar periódicamente contexto actualizado o inyectado.
+
+**Migración:** Para conversaciones muy largas, inyecta lo que anteriormente eran recordatorios del asistente rellenados previamente en el turno del usuario. Si la hidratación de contexto es parte de un sistema más complejo y agéntico, considera hidratar a través de herramientas (exponer o alentar el uso de herramientas que contengan contexto basado en heurísticas como el número de turnos) o durante la compactación de contexto.
+
+</section>
+
+### Salida LaTeX
+
+Claude Opus 4.6 utiliza LaTeX por defecto para expresiones matemáticas, ecuaciones y explicaciones técnicas. Si prefieres texto plano, agrega las siguientes instrucciones a tu indicación:
+
+```text Sample prompt
+Format your response in plain text only. Do not use LaTeX, MathJax, or any markup notation such as \( \), $, or \frac{}{}. Write all math expressions using standard text characters (e.g., "/" for division, "*" for multiplication, and "^" for exponents).
+```
+
+## Consideraciones de migración
+
+Al migrar a modelos Claude 4.6 desde generaciones anteriores:
+
+1. **Sé específico sobre el comportamiento deseado**: Considera describir exactamente lo que te gustaría ver en la salida.
+
+2. **Enmarca tus instrucciones con modificadores**: Agregar modificadores que alienten a Claude a aumentar la calidad y el detalle de su salida puede ayudar a dar forma mejor al desempeño de Claude. Por ejemplo, en lugar de "Crear un panel de análisis", utiliza "Crear un panel de análisis. Incluye tantas características e interacciones relevantes como sea posible. Ve más allá de lo básico para crear una implementación completamente funcional."
+
+3. **Solicita características específicas explícitamente**: Las animaciones y elementos interactivos deben solicitarse explícitamente cuando se deseen.
+
+4. **Actualiza la configuración de pensamiento**: Claude Opus 4.6 utiliza [pensamiento adaptativo](/docs/es/build-with-claude/adaptive-thinking) (`thinking: {type: "adaptive"}`) en lugar de pensamiento manual con `budget_tokens`. Utiliza el [parámetro de esfuerzo](/docs/es/build-with-claude/effort) para controlar la profundidad del pensamiento.
+
+5. **Migra desde respuestas rellenadas previamente**: Las respuestas rellenadas previamente en el último turno del asistente están deprecadas a partir de Claude Opus 4.6. Consulta [Migración desde respuestas rellenadas previamente](#migración-desde-respuestas-rellenadas-previamente) para obtener orientación detallada sobre alternativas.
+
+6. **Ajusta la indicación anti-pereza**: Si tus indicaciones anteriormente alentaban al modelo a ser más exhaustivo o usar herramientas de manera más agresiva, reduce esa orientación. Claude Opus 4.6 es significativamente más proactivo y puede sobreactivarse en instrucciones que eran necesarias para modelos anteriores.
+
+Para pasos de migración detallados, consulta la [Guía de migración](/docs/es/about-claude/models/migration-guide).
