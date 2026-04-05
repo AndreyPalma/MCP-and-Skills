@@ -97,3 +97,5 @@ After generating, review card by card:
 ☑ The prompt starts by asking YOU questions.
 "Start by using AskUserQuestion to make sure you have enough context from me before researching."
 
+Necesito ayuda con la revisión y mejor reestructuración de los agentes creados adjuntos que son para trabajar bajo Spec Driven Development (SDD) utilizando de orquestador el sdd-orquestrator y de subagente los demás, sin embargo tengo un dilema al intentar empezar a trabajar con un proyecto y quiero que de forma eficiente los subagentes puedan buscar skills que necesiten dentro del proyecto o globalmente, ya que actualmente tengo el inconveniente de que no funciona de fomra optima eso, buscan mal las rutas o no leen skills tipo buenas practicas de codigo, frontend-design etc que son valiosas que los subagentes las lean y apliquen, no el orquestador principal para cuidar la ventana de contexto principal, ayudame a mejorar este flujo de trabajo para que funcione de forma mas eficiente para poder probar el flujo completo de forma correcta (Las rutas indicadas entre los agentes si existen y son correctas, sin embargo al usarlos no funcionan correctamente)
+
