@@ -1,0 +1,161 @@
+Crea una nueva skill llamada `db2-ibmi-catalogs` para Claude Code siguiendo 
+la arquitectura de Progressive Disclosure (SKILL.md + references/ + fetch 
+dinámico de URLs IBM).
+
+---
+
+## PROPÓSITO
+
+La skill debe permitirle a Claude:
+1. Consultar y explicar vistas de catálogo del sistema DB2 for IBM i 7.4
+2. Generar queries SQL listos para ejecutar sobre esos catálogos
+3. Comparar esquemas entre librerías/colecciones y detectar diferencias
+4. Investigar dinámicamente documentación oficial de IBM cuando se requiera 
+   detalle no cubierto en los references locales
+
+---
+
+## ESTRUCTURA DE ARCHIVOS
+
+db2-ibmi-catalogs/
+├── SKILL.md
+└── references/
+    ├── catalog-views-quickref.md   ← vistas más usadas con columnas clave
+    ├── schema-comparison.md        ← patrones SQL para comparar esquemas
+    └── fetch-index.md              ← tabla de URLs IBM por tema
+
+---
+
+## INSTRUCCIONES PARA CADA ARCHIVO
+
+### SKILL.md
+
+Debe incluir:
+
+**Frontmatter YAML:**
+- name: db2-ibmi-catalogs
+- description: Orientada a trigger agresivo. Incluir frases como: 
+  "catálogo DB2", "SYSCOLUMNS", "SYSTABLES", "SYSKEYS", "SYSINDEXES", 
+  "esquema IBM i", "librerías DB2", "comparar tablas", "metadata DB2", 
+  "objetos de base de datos IBM i", "diferencias entre esquemas", 
+  "documentar tablas DB2". Activar también cuando el usuario pregunte 
+  sobre estructura de tablas, columnas, índices o constraints en IBM i.
+
+**Cuerpo:**
+- Sección "Cómo usar esta skill": decisión tree para elegir entre:
+  a) Leer references/catalog-views-quickref.md (consultas frecuentes)
+  b) Leer references/schema-comparison.md (comparación de esquemas)
+  c) Hacer web_fetch a la URL correspondiente de references/fetch-index.md 
+     (cuando se necesita detalle oficial o algo no cubierto localmente)
+- Sección "Convenciones de output":
+  - Si el usuario pide una query → entregar SQL listo para ejecutar en 
+    IBM i (compatible con STRSQL o Run SQL Scripts), con comentarios inline
+  - Si el usuario pide documentación o comparación → entregar Markdown 
+    estructurado con tablas
+  - Si ambos aplican → SQL primero, luego explicación en Markdown
+- Sección "Notas de versión": todas las queries y referencias son para 
+  IBM i 7.4. Si el usuario menciona otra versión, advertir posibles 
+  diferencias y ofrecer buscar la URL correcta.
+
+---
+
+### references/catalog-views-quickref.md
+
+Contenido a incluir:
+
+**Vistas principales con sus columnas más útiles:**
+
+QSYS2.SYSTABLES
+- TABLE_NAME, TABLE_SCHEMA, TABLE_TYPE, SYSTEM_TABLE_NAME, 
+  SYSTEM_TABLE_SCHEMA, ROW_LENGTH, NUMBER_COLUMNS, LAST_ALTERED_TIMESTAMP
+
+QSYS2.SYSCOLUMNS  
+- TABLE_NAME, TABLE_SCHEMA, COLUMN_NAME, ORDINAL_POSITION, DATA_TYPE, 
+  LENGTH, NUMERIC_SCALE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_TEXT
+
+QSYS2.SYSKEYS
+- INDEX_NAME, INDEX_SCHEMA, COLUMN_NAME, ORDINAL_POSITION, ORDERING
+
+QSYS2.SYSINDEXES
+- INDEX_NAME, INDEX_SCHEMA, TABLE_NAME, TABLE_SCHEMA, IS_UNIQUE, 
+  INDEX_TYPE, SYSTEM_INDEX_NAME
+
+QSYS2.SYSCST (constraints)
+- CONSTRAINT_NAME, CONSTRAINT_SCHEMA, CONSTRAINT_TYPE, TABLE_NAME, 
+  TABLE_SCHEMA
+
+QSYS2.SYSREFCST (foreign keys)
+- CONSTRAINT_NAME, UNIQUE_CONSTRAINT_NAME, MATCH_OPTION, 
+  UPDATE_RULE, DELETE_RULE
+
+**Queries de ejemplo listos para copiar:**
+- Listar todas las tablas de una librería
+- Listar columnas de una tabla específica
+- Listar índices de una tabla
+- Listar PKs y FKs de un esquema
+- Buscar una columna por nombre en todas las tablas de una librería
+
+---
+
+### references/schema-comparison.md
+
+Contenido a incluir:
+
+**Patrones SQL para comparar dos esquemas/librerías:**
+- Tablas presentes en esquema A pero no en B (EXCEPT / NOT EXISTS)
+- Columnas que difieren entre la misma tabla en dos esquemas 
+  (nombre, tipo, longitud, nullability)
+- Índices presentes en A pero no en B
+- Diferencias en constraints entre esquemas
+- Template de query parametrizable con :SCHEMA_A y :SCHEMA_B 
+  como variables de sustitución
+
+**Formato de output recomendado:**
+Indicar que los resultados de comparación deben presentarse como 
+tabla Markdown con columnas: Objeto | Esquema A | Esquema B | Diferencia
+
+---
+
+### references/fetch-index.md
+
+Tabla con estructura:
+
+| Tema | URL oficial IBM i 7.4 |
+|---|---|
+| Catálogo de vistas del sistema (overview) | https://www.ibm.com/docs/en/i/7.4?topic=views-catalog |
+| SYSTABLES | https://www.ibm.com/docs/en/i/7.4?topic=views-systables |
+| SYSCOLUMNS | https://www.ibm.com/docs/en/i/7.4?topic=views-syscolumns |
+| SYSINDEXES | https://www.ibm.com/docs/en/i/7.4?topic=views-sysindexes |
+| SYSKEYS | https://www.ibm.com/docs/en/i/7.4?topic=views-syskeys |
+| SYSCST | https://www.ibm.com/docs/en/i/7.4?topic=views-syscst |
+| SYSREFCST | https://www.ibm.com/docs/en/i/7.4?topic=views-sysrefcst |
+| SQL Reference general IBM i 7.4 | https://www.ibm.com/docs/en/i/7.4?topic=reference-sql |
+| QSYS2 Service catalog completo | https://www.ibm.com/docs/en/i/7.4?topic=services-qsys2-catalog |
+
+Incluir nota: "Antes de hacer fetch, verificar si la información ya está 
+en catalog-views-quickref.md para evitar latencia innecesaria. Solo 
+fetchear cuando el usuario pida columnas específicas no listadas, 
+comportamientos edge-case, o comparación con otra versión de IBM i."
+
+---
+
+## CRITERIOS DE ÉXITO
+
+La skill funciona correctamente si Claude:
+- [ ] Genera SQL ejecutable en IBM i sin modificaciones para casos comunes
+- [ ] Usa references locales para las vistas más frecuentes (sin fetch)
+- [ ] Hace fetch selectivo solo cuando el detalle no está en quickref
+- [ ] Entrega comparaciones de esquema en formato Markdown tabular
+- [ ] Advierte si algo podría diferir en versiones distintas a 7.4
+- [ ] No mezcla sintaxis de otras plataformas (no MySQL, no PostgreSQL)
+
+---
+
+## CASOS DE PRUEBA SUGERIDOS
+
+1. "Lista todas las tablas del esquema MILIB con su número de columnas"
+2. "Compara las tablas del esquema PROD vs DESA y dime qué diferencias hay"
+3. "Dame los índices de la tabla CLIENTES en MILIB"
+4. "Qué columnas tiene SYSCOLUMNS exactamente según IBM?"
+5. "Genera un reporte Markdown de todas las FKs del esquema VENTAS"
+6. "Busca en qué tablas del esquema MILIB existe una columna llamada CODCLI"
