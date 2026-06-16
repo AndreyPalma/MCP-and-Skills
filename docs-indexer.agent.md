@@ -67,10 +67,11 @@ heading con nombre genérico ("Configuración") es menos buscable que uno
 específico ("Configuración de TLS en Redis").
 
 FASE 2 — Optimización de tamaños:
-Un segundo proceso fusiona chunks pequeños y divide los demasiado grandes.
-Respeta como barreras absolutas los límites H1 y H2: nunca fusiona contenido
-que cruce estos niveles. Esto significa que H1 y H2 son fronteras semánticas
-duras en el documento.
+Un segundo proceso fusiona chunks pequeños y divide los demasiado grandes.  
+Respeta los límites H1 y H2 como barreras de sección: cuando el chunk  
+acumulado ya tiene suficiente contenido (≥ minChunkSize), no cruza estos  
+límites. Sin embargo, si el chunk precedente es demasiado pequeño, puede  
+fusionarse incluso cruzando H1/H2 para evitar chunks huérfanos.
 
 Regla crítica de fusión de siblings: cuando dos chunks de secciones hermanas
 (mismo nivel, distinto path) se fusionan por ser demasiado pequeños, el path
@@ -82,8 +83,8 @@ resultante se degrada al path padre común:
 
 Esto reduce la precisión del context expansion. Para evitarlo, cada sección
 H3/H4 debe tener suficiente contenido para no ser fusionada con sus vecinas.
-Como referencia práctica: una sección H3 con menos de 2-3 oraciones de
-contenido real es candidata a ser fusionada.
+Como referencia práctica: una sección H3 con menos de ~500 caracteres  
+(el minChunkSize por defecto) es candidata a ser fusionada con sus vecinas.
 
 Regla crítica de fusión de secciones no relacionadas: cuando el proceso
 fusiona chunks de secciones completamente distintas (por ejemplo, dos H1
@@ -112,26 +113,22 @@ chunks quedan en path vacío [] — sin jerarquía, sin contexto recuperable.
 
 ---
 
-## Context expansion en búsqueda
-
-Cuando un chunk coincide con una búsqueda, el sistema recupera automáticamente:
-- 1 chunk padre (contexto más amplio, nivel superior inmediato)
-- 1 chunk sibling anterior (mismo path, antes en el documento)
-- 2 chunks siblings posteriores (mismo path, después en el documento)
-- 3 chunks hijos (path extendido en 1 nivel más profundo)
-
-Luego aplica Distance Clustering: los chunks recuperados se agrupan por
-proximidad según su posición ordinal en el índice (sort_order), no por
-cantidad de caracteres. El umbral por defecto es 3 posiciones: si entre
-dos chunks hay más de 3 elementos indexados de diferencia (párrafos, tablas,
-listas, bloques de código — cada uno cuenta como 1 unidad), se separan en
-grupos distintos en lugar de ensamblarse juntos.
-
-Implicación directa: no pongas más de 2 elementos (párrafos, tablas, listas
-o bloques de código) entre un heading padre y sus hijos. Si un H2 necesita
-contenido introductorio antes de sus H3, considera convertir ese contenido
-en un H3 "Descripción general" al inicio para mantener la proximidad entre
-el padre y los hijos relevantes.
+## Context expansion en búsqueda  
+  
+Cuando un chunk coincide con una búsqueda, el sistema recupera automáticamente  
+contexto relacionado: el chunk padre (nivel superior inmediato), chunks siblings  
+cercanos (mismo path, antes y después) y chunks hijos (un nivel más profundo).  
+  
+Luego aplica Distance Clustering: los chunks recuperados se agrupan por  
+proximidad según su posición ordinal en el índice. Si dos chunks están  
+demasiado separados en el índice, terminan en grupos distintos del resultado  
+ensamblado, aunque hayan sido recolectados juntos.  
+  
+Implicación directa: mantén el contenido introductorio de un H2 al mínimo  
+antes de su primer H3 hijo. Cada elemento (párrafo, tabla, lista, bloque de  
+código) cuenta como una unidad de distancia. Si un H2 necesita introducción  
+antes de sus H3, considera convertir ese contenido en un H3 "Descripción  
+general" al inicio para mantener la proximidad entre el padre y sus hijos.
 
 ---
 
