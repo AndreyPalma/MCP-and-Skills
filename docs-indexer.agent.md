@@ -49,9 +49,9 @@ Tipos de chunk reconocidos:
 - frontmatter: metadatos YAML al inicio del archivo
 - structural: elementos estructurales sin contenido semántico
 
-IMPORTANTE: Los chunks de tipo "structural" son EXCLUIDOS de todos los
-resultados de búsqueda. Nunca pongas contenido importante en elementos que
-generen este tipo.
+NOTA: El tipo "structural" es exclusivo del procesamiento de archivos de  
+código fuente. En documentación Markdown, ningún elemento genera chunks de  
+este tipo. No es relevante para la redacción de documentos Markdown.  
 
 IMPORTANTE: Los headings H1–H6 se indexan como chunks separados de tipo
 "heading". Esto significa que el texto de cada heading es buscable
@@ -108,21 +108,21 @@ chunks quedan en path vacío [] — sin jerarquía, sin contexto recuperable.
 ## Context expansion en búsqueda
 
 Cuando un chunk coincide con una búsqueda, el sistema recupera automáticamente:  
-- Hasta 10 chunks padres (cadena de ancestros hasta la raíz)  
-- 1 chunk sibling anterior (mismo path, antes en el documento)  
+- 1 chunk padre (contexto más amplio, nivel superior)  
+- 2 chunks siblings anteriores (mismo path, antes en el documento)  
 - 2 chunks siblings posteriores (mismo path, después en el documento)  
-- 3 chunks hijos (path extendido en 1 nivel más profundo)  
+- 5 chunks hijos (path extendido en 1 nivel más profundo)  
   
 Luego aplica Distance Clustering: los chunks recuperados se agrupan por  
-proximidad en el orden original del documento. La métrica es sort_order  
-(posición ordinal de chunks en el índice), con un maxChunkDistance de 3  
-por defecto. Si hay más de 3 chunks de diferencia entre dos chunks del  
-mismo documento, se separan en resultados distintos.  
+proximidad en el orden original del documento. Si un chunk padre y sus hijos  
+están muy separados en el documento (por ejemplo, el H2 tiene más de ~1000  
+caracteres de texto antes de llegar al H3 que coincidió), el sistema los  
+divide en grupos separados en lugar de ensamblarlos juntos.  
   
-Implicación directa: no pongas más de 2-3 elementos (párrafos, tablas,  
-listas, bloques de código) entre un heading padre y sus hijos. Cada  
-elemento cuenta como 1 unidad de distancia, independientemente de su  
-tamaño en caracteres. 
+Implicación directa: no pongas bloques de contenido muy extensos entre un  
+heading padre y sus hijos. Si un H2 necesita mucho contenido introductorio  
+antes de sus H3, considera dividirlo en un H3 "Descripción general" al inicio  
+para mantener la proximidad entre el padre y los hijos relevantes.  
 
 ---
 
@@ -534,6 +534,7 @@ Reglas:
 | Contenido en comentarios HTML         | No se indexa                                                | Mover al cuerpo del documento           |
 | H3/H4 con menos de 2-3 oraciones      | Se fusiona con siblings, pierde path específico             | Agregar más contenido o fusionar manual |
 | H2 con >1000 chars antes del H3 hijo  | Distance clustering fragmenta el contexto                   | Crear H3 "Descripción general" al inicio|
+| Uso de `---` como separador semántico | El separador horizontal (HR) es completamente ignorado por el indexador y no crea ninguna separación de chunks | Usar H2/H3 para separar conceptos; el `---` no tiene efecto en el chunking | 
 
 ---
 
