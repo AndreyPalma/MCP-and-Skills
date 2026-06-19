@@ -1,57 +1,40 @@
-Voy a verificar exhaustivamente contra el schema completo, la documentación y los ejemplos para asegurarme de que no falta nada.
+Voy a hacer una auditoría exhaustiva leyendo todos los archivos relevantes en paralelo para no dejar ningún gap.
 
-No, el prompt anterior tiene gaps. Después de revisar exhaustivamente el schema Zod completo, toda la documentación y los ejemplos reales, encontré **15 omisiones o errores**. Aquí está el análisis y el prompt corregido:
-
----
-
-## Gaps encontrados en el prompt anterior
-
-### 1. Error crítico: `min`/`max` vs `minimum`/`maximum`
-El schema Zod usa `min`/`max` para todos los tipos numéricos. La documentación en `tools.mdx` usa `minimum`/`maximum` en algunos ejemplos — eso es un error en la doc. El ejemplo de referencia `employee-info.yaml` confirma `min`/`max`. [1](#7-0) [2](#7-1) 
-
-### 2. `jdbc-options` en sources (no estaba)
-Permite configurar library list, formato de fechas, naming convention. Crítico para queries con objetos no calificados. [3](#7-2) 
-
-### 3. Sintaxis de default en variables de entorno (no estaba)
-`${DB2i_PORT:8076}` — el `:` define el valor por defecto si la variable no está seteada. [4](#7-3) 
-
-### 4. `annotations.toolsets` y `annotations.customMetadata` (no estaban)
-Una tool puede declarar sus toolsets directamente en `annotations.toolsets` además de la sección `toolsets`. [5](#7-4) 
-
-### 5. Campos de `security` documentados pero no en schema
-`audit`, `requiredAuthority`, `scopes`, `warning` aparecen en ejemplos de la documentación pero **no están en el schema Zod**. El schema solo valida `readOnly`, `maxQueryLength`, `forbiddenKeywords`. Los otros campos son ignorados silenciosamente. [6](#7-5) 
-
-### 6. Variables de entorno del servidor (no estaban)
-`TOOLS_YAML_PATH`, `SELECTED_TOOLSETS`, `DB2i_JDBC_OPTIONS`, `IBMI_PAGINATION_MAX_ROWS`, `IBMI_PAGINATION_DEFAULT_PAGE_SIZE` [7](#7-6) 
-
-### 7. Tamaño óptimo de toolsets (no estaba)
-3-10 tools por toolset. Menos de 3 no tiene sentido agrupar; más de 20 reduce discoverability. [8](#7-7) 
-
-### 8. Una tool puede pertenecer a múltiples toolsets (no estaba) [9](#7-8) 
-
-### 9. `--list-toolsets` flag (no estaba)
-Para listar toolsets disponibles sin iniciar el servidor. [10](#7-9) 
-
-### 10. `metadata` en toolsets y en el root del YAML (no estaba) [11](#7-10) 
-
-### 11. Advertencia sobre `date format` en jdbc-options (no estaba)
-Sin `date format: iso`, el driver hereda el `DATFMT` del job IBM i, que puede producir años de 2 dígitos. [12](#7-11) 
-
-### 12. Aliases de columnas para mejor comprensión del LLM (no estaba)
-`cpu_used AS "CPU Time (ms)"` — mejora la interpretación del agente. [13](#7-12) 
-
-### 13. `COALESCE` pattern para parámetros opcionales con fallback (no estaba)
-`COALESCE(:object_type, '*ALL')` — alternativa al patrón `IS NULL`. [14](#7-13) 
-
-### 14. `ORDER BY` como regla obligatoria para resultados consistentes (no estaba) [13](#7-12) 
-
-### 15. `metadata` en toolsets tiene campo `metadata` (no estaba) [11](#7-10) 
+Encontré **6 gaps adicionales** que el prompt anterior no cubría. Aquí están los hallazgos y el prompt final corregido:
 
 ---
 
-## Prompt corregido y completo (10/10)
+## Gaps adicionales encontrados
 
-Reemplaza el contenido de `.github/copilot-instructions.md` con esto:
+### Gap crítico: `annotations.toolsets` es IGNORADO por el servidor
+
+El prompt anterior decía que se podía usar `annotations.toolsets` para declarar toolsets. Esto es **incorrecto**. El `toolConfigBuilder.ts` lo elimina activamente y emite un warning: [1](#8-0) 
+
+Los toolsets **solo** se definen en la sección `toolsets:`. Nunca en `annotations.toolsets`.
+
+### Gap 2: `annotations.title` se genera automáticamente
+
+Si no se especifica `annotations.title`, el servidor lo genera automáticamente desde el nombre de la tool (`formatToolTitle(toolName)`). No es necesario especificarlo. [2](#8-1) 
+
+### Gap 3: `enum` mejora automáticamente la descripción para el LLM
+
+Cuando se usa `enum`, el servidor añade automáticamente "Must be one of: ..." a la descripción. No es necesario documentarlo manualmente en la `description`. [3](#8-2) 
+
+### Gap 4: `enum` también funciona para `float` y `boolean`
+
+El schema permite `enum` para todos los tipos numéricos y boolean, no solo para `string` e `integer`. [4](#8-3) 
+
+### Gap 5: `jdbc-options.naming: system` para SQL legacy
+
+Para queries con sintaxis `LIBRARY/OBJECT` (slash-notation) en lugar de `LIBRARY.OBJECT` (dot-notation). [5](#8-4) 
+
+### Gap 6: `jdbc-options.libraries` acepta string comma-separated
+
+Además de array, acepta `libraries: "MYLIB, DEVDATA, QGPL"` — el servidor lo divide automáticamente. [6](#8-5) 
+
+---
+
+## Prompt final 10/10 — `.github/copilot-instructions.md`
 
 ````markdown
 # IBM i MCP Tool Builder — Instrucciones para GitHub Copilot
@@ -71,15 +54,16 @@ Todo archivo YAML tiene hasta 4 secciones (al menos una debe existir):
 # 1. SOURCES — Conexiones a la base de datos
 sources:
   ibmi-system:
-    host: ${DB2i_HOST}                          # REQUERIDO — siempre env vars
-    user: ${DB2i_USER}                          # REQUERIDO
-    password: ${DB2i_PASS}                      # REQUERIDO
-    port: ${DB2i_PORT:8076}                     # Opcional, default 8076 (Mapepire)
-    ignore-unauthorized: false                  # false en producción, true solo en dev
-    jdbc-options:                               # Opcional — opciones JDBC al driver
-      libraries: [MYLIB, QGPL]                 # Lista de bibliotecas para nombres no calificados
-      naming: sql                               # "sql" (SCHEMA.OBJ) o "system" (LIB/OBJ)
-      date format: iso                          # SIEMPRE usar "iso" para evitar años de 2 dígitos
+    host: ${DB2i_HOST}                              # REQUERIDO — siempre env vars
+    user: ${DB2i_USER}                              # REQUERIDO
+    password: ${DB2i_PASS}                          # REQUERIDO
+    port: ${DB2i_PORT:8076}                         # Opcional, default 8076
+    ignore-unauthorized: ${DB2i_IGNORE_UNAUTHORIZED:false}  # false en producción
+    jdbc-options:                                   # Opcional
+      libraries: [MYLIB, DEVDATA, QGPL]             # Lista de bibliotecas (o string CSV)
+      date format: iso                              # RECOMENDADO para fechas consistentes
+      naming: sql                                   # "sql" (default) o "system" para LIBRARY/OBJECT
+      time format: iso                              # Opcional
 
 # 2. TOOLS — Operaciones SQL individuales
 tools:
@@ -92,22 +76,25 @@ tools:
     parameters: []           # Opcional
     security: {}             # Opcional
     annotations: {}          # Opcional
-    responseFormat: json     # Opcional: "json" (default) o "markdown"
+    responseFormat: json     # Opcional: "json" (default, mejor para IA) o "markdown"
     tableFormat: markdown    # Opcional: "markdown","ascii","grid","compact"
+                             # Solo aplica cuando responseFormat: markdown
     maxDisplayRows: 100      # Opcional: 1-1000, default 100 (solo trunca display)
     rowsToFetch: 100         # Opcional: filas a traer de DB (default mapepire: 100)
     fetchAllRows: false      # Opcional: paginar hasta agotar resultados (~30k max)
-    domain: "..."            # Opcional: clasificación de dominio (legacy, usar annotations)
-    category: "..."          # Opcional: categoría (legacy, usar annotations)
+    domain: "..."            # Opcional: legacy, preferir annotations.domain
+    category: "..."          # Opcional: legacy, preferir annotations.category
     metadata: {}             # Opcional: metadatos libres (title, version, author, etc.)
 
 # 3. TOOLSETS — Agrupaciones lógicas (3-10 tools por toolset es el tamaño óptimo)
+# IMPORTANTE: Los toolsets son la ÚNICA forma de asignar tools a grupos.
+# NO usar annotations.toolsets — el servidor lo ignora y emite un warning.
 toolsets:
   nombre_grupo:
     title: "Título legible"
     description: "Para qué sirve este grupo"
     tools:
-      - nombre_tool
+      - nombre_tool          # REQUERIDO: al menos 1 tool
     metadata: {}             # Opcional
 
 # 4. METADATA global del archivo (opcional)
@@ -157,6 +144,7 @@ parameters:
     description: "..."     # MUY RECOMENDADO — el LLM lo lee directamente
     required: true         # Opcional, default true (false si tiene default)
     default: "valor"       # Opcional — hace el parámetro opcional automáticamente
+                           # Puede ser: string, number, boolean, array, o null
 ```
 
 ### string
@@ -168,7 +156,7 @@ parameters:
   pattern: "^[A-Z][A-Z0-9_]*$"   # Regex de validación
   minLength: 1
   maxLength: 10
-  enum: ["QSYS2", "SYSTOOLS"]     # Valores permitidos (alternativa a pattern)
+  enum: ["QSYS2", "SYSTOOLS"]     # Valores permitidos — mejora descripción automáticamente
   default: "QSYS2"
 ```
 
@@ -177,6 +165,9 @@ parameters:
 - ID de empleado (6 dígitos): `"^[0-9]{6}$"`
 - Con wildcards: `"^[A-Z0-9%_*]+$"`
 - Objeto con wildcard: `"^[A-Z*][A-Z0-9_*]*$"`
+
+**Nota sobre `enum`:** Cuando se usa `enum`, el servidor añade automáticamente
+"Must be one of: ..." a la descripción del parámetro para el LLM.
 
 ### integer
 ```yaml
@@ -199,6 +190,7 @@ parameters:
   default: 80.0
   min: 0.0      # ← CORRECTO: usar "min"/"max"
   max: 100.0
+  enum: [50.0, 75.0, 90.0, 95.0]  # Opcional: también funciona para float
 ```
 
 ### boolean
@@ -239,6 +231,9 @@ WHERE (:user_filter IS NULL OR user_name = :user_filter)
 
 -- Patrón COALESCE (cuando hay un valor fallback)
 WHERE object_type = COALESCE(:object_type, '*ALL')
+
+-- Patrón con valor especial '*ALL'
+WHERE (D.DEPTNO = :department_id OR :department_id = '*ALL')
 ```
 
 ---
@@ -249,16 +244,18 @@ Las anotaciones informan al cliente MCP sobre el comportamiento de la tool:
 
 ```yaml
 annotations:
-  title: "Título legible para UI"          # Opcional
+  title: "Título legible para UI"          # Opcional — se genera automáticamente si se omite
   readOnlyHint: true                        # true = solo SELECT, no modifica datos
   idempotentHint: true                      # true = misma entrada → mismo resultado
   destructiveHint: false                    # true = puede borrar/modificar datos
   openWorldHint: false                      # true = interactúa con sistemas externos
   domain: "performance"                     # Clasificación de dominio
   category: "monitoring"                    # Categoría dentro del dominio
-  toolsets: ["performance_monitoring"]      # Toolsets a los que pertenece esta tool
   customMetadata: {}                        # Metadata personalizada adicional
 ```
+
+**IMPORTANTE:** NO usar `annotations.toolsets` — el servidor lo ignora y emite un warning.
+Los toolsets SOLO se definen en la sección `toolsets:`.
 
 **Regla:** `readOnlyHint` se deriva automáticamente de `security.readOnly` si no se especifica.
 **Deprecated:** NO usar `readOnlyHint`, `destructiveHint`, etc. a nivel raíz de la tool.
@@ -273,7 +270,7 @@ Usar siempre dentro de `annotations:`.
 
 ## CONFIGURACIÓN DE SEGURIDAD (campo `security`)
 
-Solo estos 3 campos están en el schema oficial:
+Solo estos 3 campos están en el schema oficial (los demás son ignorados):
 
 ```yaml
 security:
@@ -322,6 +319,12 @@ tableFormat: markdown       # Solo aplica con responseFormat: markdown
 maxDisplayRows: 100         # 1-1000, default 100 (solo trunca display, no fetch)
 ```
 
+**Guía de selección de tableFormat:**
+- `markdown` — LLM, web, documentación (default)
+- `ascii` — texto plano, email, sistemas legacy, no-Unicode
+- `grid` — reportes profesionales, terminales modernos
+- `compact` — displays pequeños, logs, alta densidad
+
 ---
 
 ## MEJORES PRÁCTICAS PARA DESCRIPTIONS
@@ -346,6 +349,9 @@ description: "Nombre de biblioteca IBM i. Ejemplos: 'MYLIB', '*LIBL', '*USRLIBL'
 description: "Una biblioteca"
 ```
 
+**Nota:** Cuando se usa `enum`, el servidor añade automáticamente la lista de valores
+válidos a la descripción. No es necesario repetirlos manualmente.
+
 ---
 
 ## MEJORES PRÁCTICAS SQL
@@ -369,11 +375,17 @@ WHERE (:filter IS NULL OR column = :filter)
 -- Parámetro opcional con COALESCE
 WHERE object_type = COALESCE(:object_type, '*ALL')
 
+-- Parámetro opcional con valor especial
+WHERE (column = :filter OR :filter = '*ALL')
+
 -- Paginación
 LIMIT :page_size OFFSET (:page_number - 1) * :page_size
 
 -- LEFT JOIN para relaciones opcionales (no INNER JOIN)
 LEFT JOIN SAMPLE.DEPARTMENT D ON E.WORKDEPT = D.DEPTNO
+
+-- Boolean en SQL
+WHERE (:include_completed = 1 OR end_date IS NULL)
 ```
 
 ---
@@ -405,8 +417,9 @@ FROM SYSTOOLS.SPECIAL_AUTHORITY_DATA_MART
 
 - **Tamaño óptimo:** 3-10 tools por toolset
 - **Una tool puede pertenecer a múltiples toolsets** (útil para utilities compartidas)
-- **Estrategias de organización:** por dominio funcional, proceso de negocio, rol de usuario, o entorno
+- **Estrategias:** por dominio funcional, proceso de negocio, rol de usuario, o entorno
 - **Siempre incluir** `title` y `description` en cada toolset
+- **Los toolsets son la ÚNICA forma de asignar tools a grupos** — no usar `annotations.toolsets`
 
 ```yaml
 toolsets:
@@ -430,11 +443,14 @@ toolsets:
 | `DB2i_PASS` | Password |
 | `DB2i_PORT` | Puerto Mapepire (default 8076) |
 | `DB2i_JDBC_OPTIONS` | Override global de jdbc-options (ej: `naming=system;date format=iso`) |
-| `TOOLS_YAML_PATH` | Ruta al archivo/directorio de tools |
+| `TOOLS_YAML_PATH` | Ruta al archivo o directorio de tools |
 | `SELECTED_TOOLSETS` | Toolsets a cargar (comma-separated) |
 | `IBMI_EXECUTE_SQL_READONLY` | `true` = fuerza read-only global |
 | `IBMI_PAGINATION_MAX_ROWS` | Límite de paginación (default 30000) |
 | `IBMI_PAGINATION_DEFAULT_PAGE_SIZE` | Tamaño de página (default 1000) |
+| `MCP_TRANSPORT_TYPE` | `stdio` o `http` |
+| `MCP_LOG_LEVEL` | `debug`, `info`, `warn`, `error` |
+| `IBMI_HTTP_AUTH_ENABLED` | Habilitar autenticación bearer token |
 
 ---
 
@@ -482,6 +498,7 @@ Requiere la extensión "YAML by Red Hat" en VS Code.
 - [ ] `source` referencia una clave existente en `sources`
 - [ ] Credenciales usan variables de entorno (`${VAR}` o `${VAR:default}`)
 - [ ] `jdbc-options.date format: iso` si la tool retorna fechas
+- [ ] `ignore-unauthorized: false` en sources de producción
 - [ ] `description` es específica y útil para un LLM (incluye ejemplos de valores)
 - [ ] Todos los valores dinámicos usan `:param_name` (nunca `${param}`)
 - [ ] Parámetros string con IBM i names tienen `pattern: "^[A-Z][A-Z0-9_]*$"` y `maxLength: 10`
@@ -493,118 +510,77 @@ Requiere la extensión "YAML by Red Hat" en VS Code.
 - [ ] `security.readOnly: true` para todas las tools SELECT
 - [ ] `annotations.readOnlyHint: true` para todas las tools SELECT
 - [ ] `annotations.readOnlyHint: false` + `security.readOnly: false` para tools de escritura
-- [ ] Tool está incluida en al menos un toolset
+- [ ] NO usar `annotations.toolsets` (es ignorado por el servidor)
+- [ ] Tool está incluida en al menos un toolset en la sección `toolsets:`
 - [ ] Toolset tiene `title` y `description`
+- [ ] Toolset tiene al menos 1 tool en el array `tools:`
 - [ ] Ejecutar `npm run validate` para verificar sintaxis
-- [ ] `ignore-unauthorized: false` en sources de producción
 ````
 
 ---
 
-El cambio más importante respecto al prompt anterior es la corrección de `min`/`max` (el schema usa esos nombres, no `minimum`/`maximum`), la adición de `jdbc-options` con la advertencia de `date format: iso`, y la aclaración de qué campos de `security` realmente existen en el schema. [15](#7-14) [16](#7-15) [8](#7-7)
+El cambio más importante respecto al prompt anterior es la **corrección de `annotations.toolsets`** — el servidor lo ignora activamente. Los demás cambios son adiciones: `enum` mejora automáticamente las descripciones, `annotations.title` se genera automáticamente, `naming: system` para SQL legacy, y la aclaración de que `min`/`max` es la sintaxis correcta (no `minimum`/`maximum`). [1](#8-0) [7](#8-6) [8](#8-7) [4](#8-3) [9](#8-8)
 
 ### Citations
 
-**File:** packages/server/src/ibmi-mcp-server/schemas/config.ts (L50-68)
+**File:** packages/server/src/ibmi-mcp-server/utils/config/toolConfigBuilder.ts (L502-517)
 ```typescript
-    min: z.number().optional().describe("Minimum value for numeric types"),
-    max: z.number().optional().describe("Maximum value for numeric types"),
-    minLength: z
-      .number()
-      .optional()
-      .describe("Minimum length for string/array types"),
-    maxLength: z
-      .number()
-      .optional()
-      .describe("Maximum length for string/array types"),
-    enum: z
-      .array(z.union([z.string(), z.number(), z.boolean()]))
-      .optional()
-      .describe("Valid values (enum validation)"),
-    pattern: z
-      .string()
-      .optional()
-      .describe("Custom validation pattern (regex for strings)"),
-  })
+    if (
+      Array.isArray(annotationInput.toolsets) &&
+      annotationInput.toolsets.length > 0
+    ) {
+      logger.warning(
+        {
+          toolName,
+          providedToolsets: annotationInput.toolsets,
+          resolvedToolsets: toolsets,
+        },
+        "Tool annotations specified 'toolsets', but toolset membership is derived from YAML toolset mappings. Ignoring provided values.",
+      );
+    }
+
+    // Remove any externally provided toolsets to prevent divergence from configured mappings
+    delete annotationInput.toolsets;
 ```
 
-**File:** packages/server/src/ibmi-mcp-server/schemas/config.ts (L104-127)
+**File:** packages/server/src/ibmi-mcp-server/utils/config/toolConfigBuilder.ts (L524-538)
 ```typescript
-    "jdbc-options": z
-      .object({
-        libraries: z
-          .union([
-            z.array(z.string().min(1)),
-            z
-              .string()
-              .transform((val) =>
-                val
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              ),
-          ])
-          .optional(),
-      })
-      .passthrough()
-      .optional()
-      .describe(
-        "JDBC connection options passed to the mapepire connection pool. " +
-          "Supports any mapepire JDBCOption (libraries, naming, date format, etc.). " +
-          "The 'libraries' field accepts an array or comma-separated string. " +
-          "Env var DB2i_JDBC_OPTIONS overrides these values per-source.",
-      ),
+    const resolvedAnnotations: ToolAnnotations = {
+      ...annotationInput,
+      title: annotationInput.title ?? this.formatToolTitle(toolName),
+      domain: annotationInput.domain ?? config.domain,
+      category: annotationInput.category ?? config.category,
+      readOnlyHint:
+        annotationInput.readOnlyHint ??
+        legacyReadOnly ??
+        config.security?.readOnly ??
+        true,
+      openWorldHint: annotationInput.openWorldHint ?? legacyOpenWorld,
+      idempotentHint: annotationInput.idempotentHint ?? legacyIdempotent,
+      destructiveHint: annotationInput.destructiveHint ?? legacyDestructive,
+      toolsets,
+    };
 ```
 
-**File:** packages/server/src/ibmi-mcp-server/schemas/config.ts (L134-151)
-```typescript
-export const SqlToolSecurityConfigSchema = z
-  .object({
-    readOnly: z
-      .boolean()
-      .optional()
-      .describe(
-        "Whether to restrict to read-only operations (default: true for safety)",
-      ),
-    maxQueryLength: z
-      .number()
-      .optional()
-      .describe("Maximum SQL query length in characters (default: 10000)"),
-    forbiddenKeywords: z
-      .array(z.string())
-      .optional()
-      .describe("Additional forbidden SQL keywords beyond the default list"),
-  })
-  .describe("Security configuration for SQL tool execution");
+**File:** tools/README.md (L200-208)
+```markdown
+
+| Type | Description | Use Cases | Constraints Available |
+|------|-------------|-----------|----------------------|
+| `string` | Text values | Library names, object names, patterns | `minLength`, `maxLength`, `pattern`, `enum` |
+| `integer` | Whole numbers | Row limits, IDs, counts | `min`, `max`, `enum` |
+| `float` | Decimal numbers | Thresholds, percentages, measurements | `min`, `max`, `enum` |
+| `boolean` | True/false values | Flags, enable/disable options | None (inherently constrained) |
+| `array` | List of values | Multiple filters, batch operations | `minLength`, `maxLength`, `itemType` |
+
 ```
 
-**File:** packages/server/src/ibmi-mcp-server/schemas/config.ts (L253-263)
-```typescript
-export const SqlToolsetConfigSchema = z
-  .object({
-    title: z.string().optional().describe("Human-readable toolset title"),
-    description: z.string().optional().describe("Toolset description"),
-    tools: z
-      .array(z.string().min(1, "Tool name cannot be empty"))
-      .min(1, "Toolset must contain at least one tool")
-      .describe("List of tool names in this toolset"),
-    metadata: MetadataSchema.optional().describe("Optional toolset metadata"),
-  })
-  .describe("Toolset definition for grouping related tools");
+**File:** tools/README.md (L276-279)
+```markdown
+    enum: [ALIAS, FUNCTION, INDEX, PACKAGE, PROCEDURE, ROUTINE, SEQUENCE, TABLE, TRIGGER, TYPE, VARIABLE, VIEW, XSR]
 ```
+> When `enum` is provided, the description is automatically enhanced with "Must be one of: 'ALIAS', 'FUNCTION', ..." for LLM clarity.
 
-**File:** tools/sample/employee-info.yaml (L178-187)
-```yaml
-        description: "Minimum salary filter (optional)"
-        min: 0
-        max: 100000
-        default: 0
-      - name: max_salary
-        type: integer
-        description: "Maximum salary filter (optional)"
-        min: 0
-        max: 100000
-        default: 100000
 ```
 
 **File:** docs/sql-tools/sources.mdx (L220-254)
@@ -646,38 +622,144 @@ export const SqlToolsetConfigSchema = z
     </Note>
 ```
 
-**File:** docs/sql-tools/sources.mdx (L272-278)
+**File:** docs/sql-tools/sources.mdx (L280-296)
 ```text
-    - `eur` → `17.04.2026` (DD.MM.YYYY)
-    - `jis` → `2026-04-17` (same as ISO)
+  <Tab title="SQL Naming">
+    ```yaml
+    sources:
+      ibmi-system:
+        host: ${DB2i_HOST}
+        user: ${DB2i_USER}
+        password: ${DB2i_PASS}
+        jdbc-options:
+          naming: system   # LIBRARY/OBJECT syntax
+    ```
 
-    <Warning>
-    **Job default caveat**: If you don't set `date format`, the driver inherits the connected job's `DATFMT` system value — which on many systems produces **two-digit years** (e.g., `04/17/26`). Set `date format: iso` explicitly if unambiguous serialization matters to your application.
-    </Warning>
+    **Use for**: Legacy SQL using `LIBRARY/OBJECT` slash-notation instead of standard `LIBRARY.OBJECT` dot-notation.
+
+    **Values:**
+    - `sql` (default) — standard `SCHEMA.OBJECT`
+    - `system` — IBM i legacy `LIBRARY/OBJECT`
   </Tab>
 ```
 
-**File:** docs/sql-tools/sources.mdx (L370-384)
-```text
-Provide fallback values for optional settings:
-
-```yaml
-sources:
-  ibmi-system:
-    host: ${DB2i_HOST}
-    user: ${DB2i_USER}
-    password: ${DB2i_PASS}
-    port: ${DB2i_PORT:8076}                           # Defaults to 8076
-    ignore-unauthorized: ${DB2i_IGNORE_UNAUTHORIZED:false}  # Defaults to false
-```
-
-<Note>
-**Syntax**: `${VARIABLE_NAME:default_value}` - Use `:` to specify default values that apply when the environment variable is not set.
-</Note>
-```
-
-**File:** packages/server/src/ibmi-mcp-server/schemas/common.ts (L87-98)
+**File:** packages/server/src/ibmi-mcp-server/schemas/config.ts (L19-69)
 ```typescript
+export const SqlToolParameterSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, "Parameter name cannot be empty")
+      .describe("Parameter name used in SQL statement"),
+    type: z
+      .enum(["string", "boolean", "integer", "float", "array"])
+      .describe("Parameter data type for validation"),
+    description: z
+      .string()
+      .optional()
+      .describe("Human-readable parameter description"),
+    default: z
+      .union([
+        z.string(),
+        z.number(),
+        z.boolean(),
+        z.array(z.unknown()),
+        z.null(),
+      ])
+      .optional()
+      .describe("Default value when parameter is not provided"),
+    required: z
+      .boolean()
+      .optional()
+      .describe("Whether parameter is required (overrides default)"),
+    itemType: z
+      .enum(["string", "boolean", "integer", "float"])
+      .optional()
+      .describe("Array item type (only for array parameters)"),
+    min: z.number().optional().describe("Minimum value for numeric types"),
+    max: z.number().optional().describe("Maximum value for numeric types"),
+    minLength: z
+      .number()
+      .optional()
+      .describe("Minimum length for string/array types"),
+    maxLength: z
+      .number()
+      .optional()
+      .describe("Maximum length for string/array types"),
+    enum: z
+      .array(z.union([z.string(), z.number(), z.boolean()]))
+      .optional()
+      .describe("Valid values (enum validation)"),
+    pattern: z
+      .string()
+      .optional()
+      .describe("Custom validation pattern (regex for strings)"),
+  })
+  .describe("SQL tool parameter definition with validation constraints");
+```
+
+**File:** packages/server/src/ibmi-mcp-server/schemas/common.ts (L27-98)
+```typescript
+export const ToolAnnotationsSchema = z
+  .object({
+    /**
+     * An optional human-readable name for the tool, optimized for UI display.
+     */
+    title: z
+      .string()
+      .optional()
+      .describe("Human-readable tool title for UI display"),
+    /**
+     * A hint indicating that the tool does not modify any state.
+     */
+    readOnlyHint: z
+      .boolean()
+      .optional()
+      .describe("Indicates the tool performs read-only operations"),
+    /**
+     * A hint indicating that the tool may interact with external systems.
+     */
+    openWorldHint: z
+      .boolean()
+      .optional()
+      .describe(
+        "Indicates the tool interacts with external, unpredictable systems",
+      ),
+    /**
+     * Indicates that the tool has no side effects when called multiple times.
+     */
+    idempotentHint: z
+      .boolean()
+      .optional()
+      .describe(
+        "Indicates the tool produces consistent results for identical inputs",
+      ),
+    /**
+     * Indicates that the tool may produce destructive side effects.
+     */
+    destructiveHint: z
+      .boolean()
+      .optional()
+      .describe(
+        "Indicates the tool may perform destructive or irreversible operations",
+      ),
+    /**
+     * Domain classification for filtering and organization.
+     */
+    domain: z
+      .string()
+      .optional()
+      .describe("Domain classification for client-side filtering"),
+    /**
+     * Category classification for filtering and organization.
+     */
+    category: z
+      .string()
+      .optional()
+      .describe("Category classification for client-side filtering"),
+    /**
+     * Toolsets that the tool belongs to.
+     */
     toolsets: z
       .array(z.string())
       .optional()
@@ -690,145 +772,4 @@ sources:
     ),
   })
   .catchall(z.unknown())
-```
-
-**File:** docs/sql-tools/tools.mdx (L448-461)
-```text
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `rowsToFetch` | integer (≥ 1) | `100` (mapepire default) | With `fetchAllRows: true`, the number of rows per `fetchMore` call. Without `fetchAllRows`, a single-shot cap applied to `FETCH FIRST :limit ROWS ONLY`-style queries. |
-| `fetchAllRows` | boolean | `false` | When `true`, paginate until the database reports `is_done` or the safety ceiling (`IBMI_PAGINATION_MAX_ROWS`, default `30000`) is reached. |
-
-### Composition
-
-| Config | Behavior |
-|---|---|
-| `rowsToFetch: N` alone | Single-shot `execute(N)` — up to N rows, one round-trip |
-| `fetchAllRows: true` alone | Paginate with `IBMI_PAGINATION_DEFAULT_PAGE_SIZE` (default `1000`) per fetch |
-| `fetchAllRows: true, rowsToFetch: N` | Paginate with **N rows per fetch** — tune per tool for wide rows |
-
-When the paginated result hits `IBMI_PAGINATION_MAX_ROWS`, the server truncates the rows returned and emits a warning log. The CLI surfaces the truncation in the output footer so callers know the result was clipped.
-```
-
-**File:** docs/sql-tools/tools.mdx (L780-797)
-```text
-  <Accordion title="SQL Statement Design" icon="database">
-    **Optimization:**
-    - Always include `FETCH FIRST n ROWS ONLY` to limit results
-    - Use `LEFT JOIN` instead of `INNER JOIN` when relationships are optional
-    - Add `ORDER BY` for consistent result ordering
-    - Use column aliases for better AI understanding
-
-    **Example:**
-    ```sql
-    SELECT
-      job_name AS "Job Name",
-      user_name AS "User",
-      cpu_used AS "CPU Time (ms)"
-    FROM qsys2.active_job_info
-    WHERE job_status = 'ACTIVE'
-    ORDER BY cpu_used DESC
-    FETCH FIRST 100 ROWS ONLY
-    ```
-```
-
-**File:** docs/sql-tools/toolsets.mdx (L349-374)
-```text
-### List Available Toolsets
-
-```bash
-# Show all toolsets without starting the server
-npx -y @ibm/ibmi-mcp-server@latest --list-toolsets --tools tools/my-tools.yaml
-```
-
-**Output:**
-```
-Available toolsets in tools/my-tools.yaml:
-
-performance_monitoring:
-  Title: Performance Monitoring
-  Description: Tools for monitoring IBM i system performance
-  Tools: system_status, active_job_info, memory_pools (3 tools)
-
-security_audit:
-  Title: Security Audit
-  Description: Security analysis and compliance reporting
-  Tools: user_profile_audit, object_authority_check (2 tools)
-
-employee_information:
-  Title: Employee Information
-  Description: Employee data retrieval and analysis
-  Tools: get_employee_details, find_employees_by_department, search_employees (3 tools)
-```
-```
-
-**File:** docs/sql-tools/toolsets.mdx (L559-584)
-```text
-<AccordionGroup>
-  <Accordion title="Toolset Size" icon="layer-group">
-    **Optimal size:** 3-10 tools per toolset
-
-    - **Too small** (1-2 tools): Defeats the purpose of grouping
-    - **Too large** (20+ tools): Reduces discoverability and increases load time
-    - **Just right** (3-10 tools): Easy to understand and manage
-
-    **Example:**
-    ```yaml
-    # ✅ Good size
-    toolsets:
-      performance_monitoring:
-        tools: [system_status, active_jobs, memory_pools, cpu_usage]
-
-    # ❌ Too small
-    toolsets:
-      single_tool_set:
-        tools: [system_status]
-
-    # ❌ Too large
-    toolsets:
-      everything:
-        tools: [tool1, tool2, ... tool25]
-    ```
-  </Accordion>
-```
-
-**File:** docs/sql-tools/toolsets.mdx (L609-633)
-```text
-  <Accordion title="Cross-Toolset Tools" icon="arrows-split">
-    **Tools can belong to multiple toolsets:**
-
-    ```yaml
-    tools:
-      system_health:
-        # ... config
-
-    toolsets:
-      production_monitoring:
-        tools:
-          - system_health
-          - prod_metrics
-
-      development_monitoring:
-        tools:
-          - system_health  # Same tool in different toolset
-          - dev_metrics
-    ```
-
-    **Use cases:**
-    - Shared utility tools (logging, health checks)
-    - Cross-domain tools (system information)
-    - Different access levels to same tool
-  </Accordion>
-```
-
-**File:** docs/sql-tools/building-tools.mdx (L836-843)
-```text
-        description: "Object type filter (optional)"
-    statement: |
-      SELECT object_name, object_type, object_size,
-             created_timestamp, last_used_timestamp,
-             object_owner, authorization_list
-      FROM table(qsys2.object_statistics(:library,
-                 COALESCE(:object_type, '*ALL'))) x
-      ORDER BY object_name
 ```
