@@ -1,0 +1,29 @@
+## CONVENCIÓN DE NOMENCLATURA DE TOOLS  
+- Nombres de tools: `lowercase_with_underscores` (ej: `get_active_jobs`, `find_employees_by_department`)  
+- Evitar: `emp`, `query1`, `temp_tool`, abreviaciones ambiguas  
+  
+## COMPORTAMIENTO DE `required`  
+- `required: true` → parámetro obligatorio (default si no se especifica `default`)  
+- `required: false` → parámetro opcional, valor será NULL si no se provee  
+- Si se especifica `default`, `required` es implícitamente `false` — no es necesario escribirlo  
+  
+## `annotations.title` ES OPCIONAL  
+- Si no se especifica, el servidor lo genera automáticamente desde el nombre de la tool  
+- `get_employee_details` → "Get Employee Details" (automático)  
+- Solo especificar si se quiere un título diferente al generado  
+  
+## `responseFormat: markdown` ES REQUERIDO PARA FORMATTING  
+- `tableFormat` y `maxDisplayRows` SOLO tienen efecto cuando `responseFormat: markdown`  
+- Sin `responseFormat: markdown`, el output es JSON crudo (default)  
+- Si no necesitas formato visual, omitir `responseFormat` (default json es mejor para IA)  
+  
+## `enum` APLICA A TODOS LOS TIPOS NUMÉRICOS Y BOOLEAN  
+- `string`: enum de strings  
+- `integer`: enum de enteros  
+- `float`: enum de decimales  
+- `boolean`: enum de true/false (raro pero válido)  
+  
+## `metadata` (OPCIONAL, LIBRE)  
+- Disponible en tools individuales, toolsets, y en el root del YAML  
+- Acepta cualquier key-value arbitrario para metadata personalizada  
+- Ejemplo: `metadata: { version: "1.0", author: "team-ibmi", environment: "prod" }`
